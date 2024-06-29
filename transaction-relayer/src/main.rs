@@ -35,7 +35,8 @@ use jito_relayer::{
 };
 use jito_relayer_web::{start_relayer_web_server, RelayerState};
 use jito_rpc::load_balancer::LoadBalancer;
-use jito_transaction_relayer::forwarder::start_forward_and_delay_thread;
+use jito_transaction_relayer::forwarder::start_traffic_scorer_threads;
+use jito_transaction_relayer::scorer::TrafficScorer;
 use jwt::{AlgorithmType, PKeyWithDigest};
 use log::{debug, error, info, warn};
 use openssl::{hash::MessageDigest, pkey::PKey};
@@ -460,13 +461,12 @@ fn main() {
     let (block_engine_sender, block_engine_receiver) =
         channel(jito_transaction_relayer::forwarder::BLOCK_ENGINE_FORWARDER_QUEUE_CAPACITY);
 
-    let forward_and_delay_threads = start_forward_and_delay_thread(
+    let forward_and_delay_threads = start_traffic_scorer_threads(
         verified_receiver,
         delay_packet_sender,
         args.packet_delay_ms,
-        block_engine_sender,
         1,
-        args.disable_mempool,
+        Arc::new(TrafficScorer::new()),
         &exit,
     );
 

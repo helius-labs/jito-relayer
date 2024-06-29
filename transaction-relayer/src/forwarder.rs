@@ -8,6 +8,7 @@ use std::{
     time::{Duration, Instant, SystemTime},
 };
 
+use crate::scorer::TrafficScorer;
 use crossbeam_channel::{Receiver, RecvTimeoutError, Sender};
 use jito_block_engine::block_engine::BlockEnginePackets;
 use jito_relayer::relayer::RelayerPacketBatches;
@@ -19,25 +20,23 @@ pub const BLOCK_ENGINE_FORWARDER_QUEUE_CAPACITY: usize = 5_000;
 
 /// Forwards packets to the Block Engine handler thread.
 /// Delays transactions for packet_delay_ms before forwarding them to the validator.
-pub fn start_forward_and_delay_thread(
+pub fn start_traffic_scorer_threads(
     verified_receiver: Receiver<BankingPacketBatch>,
-    delay_packet_sender: Sender<RelayerPacketBatches>,
+    outgoing_packet_sender: Sender<RelayerPacketBatches>,
     packet_delay_ms: u32,
-    block_engine_sender: tokio::sync::mpsc::Sender<BlockEnginePackets>,
     num_threads: u64,
-    disable_mempool: bool,
+    scorer: Arc<TrafficScorer>,
     exit: &Arc<AtomicBool>,
 ) -> Vec<JoinHandle<()>> {
     const SLEEP_DURATION: Duration = Duration::from_millis(5);
-    let packet_delay = Duration::from_millis(packet_delay_ms as u64);
 
     (0..num_threads)
         .map(|thread_id| {
             let verified_receiver = verified_receiver.clone();
-            let delay_packet_sender = delay_packet_sender.clone();
-            let block_engine_sender = block_engine_sender.clone();
+            let delay_packet_sender = outgoing_packet_sender.clone();
 
             let exit = exit.clone();
+            let co_scorer = scorer.clone();
             Builder::new()
                 .name(format!("forwarder_thread_{thread_id}"))
                 .spawn(move || {
@@ -48,7 +47,7 @@ pub fn start_forward_and_delay_thread(
                     let mut forwarder_metrics = ForwarderMetrics::new(
                         buffered_packet_batches.capacity(),
                         verified_receiver.capacity().unwrap_or_default(), // TODO (LB): unbounded channel now, remove metric
-                        block_engine_sender.capacity(),
+                        0,
                     );
                     let mut last_metrics_upload = Instant::now();
 
@@ -59,7 +58,7 @@ pub fn start_forward_and_delay_thread(
                             forwarder_metrics = ForwarderMetrics::new(
                                 buffered_packet_batches.capacity(),
                                 verified_receiver.capacity().unwrap_or_default(), // TODO (LB): unbounded channel now, remove metric
-                                block_engine_sender.capacity(),
+                                0,
                             );
                             last_metrics_upload = Instant::now();
                         }
@@ -67,7 +66,6 @@ pub fn start_forward_and_delay_thread(
                         match verified_receiver.recv_timeout(SLEEP_DURATION) {
                             Ok(banking_packet_batch) => {
                                 let instant = Instant::now();
-                                let system_time = SystemTime::now();
                                 let num_packets = banking_packet_batch
                                     .0
                                     .iter()
@@ -75,31 +73,8 @@ pub fn start_forward_and_delay_thread(
                                     .sum::<u64>();
                                 forwarder_metrics.num_batches_received += 1;
                                 forwarder_metrics.num_packets_received += num_packets;
+                                let stats = co_scorer.score(&banking_packet_batch);
 
-                                // try_send because the block engine receiver only drains when it's connected
-                                // and we don't want to OOM on packet_receiver
-                                if !disable_mempool {
-                                    match block_engine_sender.try_send(BlockEnginePackets {
-                                        banking_packet_batch: banking_packet_batch.clone(),
-                                        stamp: system_time,
-                                        expiration: packet_delay_ms,
-                                    }) {
-                                        Ok(_) => {
-                                            forwarder_metrics.num_be_packets_forwarded +=
-                                                num_packets;
-                                        }
-                                        Err(TrySendError::Closed(_)) => {
-                                            panic!(
-                                                "error sending packet batch to block engine handler"
-                                            );
-                                        }
-                                        Err(TrySendError::Full(_)) => {
-                                            // block engine most likely not connected
-                                            forwarder_metrics.num_be_packets_dropped += num_packets;
-                                            forwarder_metrics.num_be_sender_full += 1;
-                                        }
-                                    }
-                                }
                                 buffered_packet_batches.push_back(RelayerPacketBatches {
                                     stamp: instant,
                                     banking_packet_batch,
@@ -111,13 +86,8 @@ pub fn start_forward_and_delay_thread(
                             }
                         }
 
-                        while let Some(packet_batches) = buffered_packet_batches.front() {
-                            if packet_batches.stamp.elapsed() < packet_delay {
-                                break;
-                            }
-                            let batch = buffered_packet_batches.pop_front().unwrap();
-
-                            let num_packets = batch
+                        while let Some(packet_batches) = buffered_packet_batches.pop_front() {
+                            let num_packets = packet_batches
                                 .banking_packet_batch
                                 .0
                                 .iter()
@@ -126,7 +96,7 @@ pub fn start_forward_and_delay_thread(
 
                             forwarder_metrics.num_relayer_packets_forwarded += num_packets;
                             delay_packet_sender
-                                .send(batch)
+                                .send(packet_batches)
                                 .expect("exiting forwarding delayed packets");
                         }
 
@@ -134,7 +104,7 @@ pub fn start_forward_and_delay_thread(
                             buffered_packet_batches.len(),
                             buffered_packet_batches.capacity(),
                             verified_receiver.len(),
-                            BLOCK_ENGINE_FORWARDER_QUEUE_CAPACITY - block_engine_sender.capacity(),
+                            BLOCK_ENGINE_FORWARDER_QUEUE_CAPACITY - 0,
                         );
                     }
                 })
@@ -153,7 +123,6 @@ struct ForwarderMetrics {
 
     pub num_relayer_packets_forwarded: u64,
 
-    // high water mark on queue lengths
     pub buffered_packet_batches_max_len: usize,
     pub buffered_packet_batches_capacity: usize,
     pub verified_receiver_max_len: usize,
