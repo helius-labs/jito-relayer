@@ -49,12 +49,15 @@ impl TrafficScorer {
                             Some(cu_details) => {
                                 let prio_per_unit =
                                     cu_details.priority / cu_details.compute_unit_limit;
+
+                                let prio = cu_details.priority;
+                                let cus = cu_details.compute_unit_limit;
                                 let hash = packet.message_hash();
                                 let addr = packet.original_packet().meta().socket_addr();
                                 let from_staked = packet.original_packet().meta().flags.contains(PacketFlags::FROM_STAKED_NODE);
                                 let payer = packet.transaction().get_message().message.static_account_keys().get(0).unwrap();
 
-                                info!("Source {addr}, txn_hash: {hash}, prio_per_unit: {prio_per_unit}, payer: {payer}, from_staked: {from_staked}");
+                                info!("Source {addr}, txn_hash: {hash}, prio: {prio}, cu_limit: {cus}, payer: {payer}, from_staked: {from_staked}");
                             }
                             None => {
                                 stats.failed_priority += 1;
