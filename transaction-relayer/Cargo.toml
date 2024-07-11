@@ -31,6 +31,8 @@ serde_yaml = { workspace = true }
 solana-address-lookup-table-program = { workspace = true }
 solana-client = { workspace = true }
 solana-core = { workspace = true }
+solana-cost-model = { workspace = true }
+solana-runtime = {workspace = true}
 solana-metrics = { workspace = true }
 solana-net-utils = { workspace = true }
 solana-perf = { workspace = true }
@@ -41,3 +43,4 @@ tikv-jemallocator = { workspace = true }
 tokio = { workspace = true }
 tokio-stream = { workspace = true }
 tonic = { workspace = true }
+thiserror = "1.0.61"
