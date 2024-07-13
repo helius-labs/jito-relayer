@@ -13,6 +13,7 @@ bincode = { workspace = true }
 clap = { workspace = true }
 crossbeam-channel = { workspace = true }
 dashmap = { workspace = true }
+duckdb = {workspace = true}
 env_logger = { workspace = true }
 hostname = { workspace = true }
 itertools = { workspace = true }

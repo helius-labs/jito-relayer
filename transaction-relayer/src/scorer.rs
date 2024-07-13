@@ -1,4 +1,6 @@
-
+use crate::db_service::TransactionRow;
+use duckdb::Connection;
+use jito_core::immutable_deserialized_packet::ImmutableDeserializedPacket;
 use log::{error, info};
 use solana_core::banking_trace::BankingPacketBatch;
 use solana_program::instruction::InstructionError::ProgramFailedToCompile;
@@ -10,10 +12,13 @@ use solana_sdk::packet::{Packet, PacketFlags};
 use solana_sdk::signature::Signature;
 use solana_sdk::transaction::{SanitizedVersionedTransaction, VersionedTransaction};
 use std::mem::size_of;
-use jito_core::immutable_deserialized_packet::ImmutableDeserializedPacket;
+use std::net::{SocketAddr, SocketAddrV4};
 use thiserror::Error;
+use tokio::sync::mpsc::{Sender, UnboundedSender};
 
-pub struct TrafficScorer {}
+pub struct TrafficScorer {
+    db_channel: UnboundedSender<TransactionRow>,
+}
 
 #[derive(Debug)]
 pub struct ScoringStats {
@@ -33,11 +38,15 @@ impl Default for ScoringStats {
 }
 
 impl TrafficScorer {
-    pub fn new() -> TrafficScorer {
-        TrafficScorer {}
+    pub fn new(db_channel: UnboundedSender<TransactionRow>) -> Self {
+        TrafficScorer { db_channel }
     }
 
     pub fn score(&self, traffic: &BankingPacketBatch) -> ScoringStats {
+        let unix_ts = std::time::SystemTime::now()
+            .duration_since(std::time::UNIX_EPOCH)
+            .unwrap()
+            .as_secs();
         let mut stats = ScoringStats::default();
         for batch in traffic.0.iter() {
             for idx in 0..batch.len() {
@@ -45,24 +54,7 @@ impl TrafficScorer {
                 stats.total_packets += 1;
                 match ImmutableDeserializedPacket::new(raw_packet) {
                     Ok(packet) => {
-                        match packet.transaction().get_transaction_priority_details(false) {
-                            Some(cu_details) => {
-                                let prio_per_unit =
-                                    cu_details.priority / cu_details.compute_unit_limit;
-
-                                let prio = cu_details.priority;
-                                let cus = cu_details.compute_unit_limit;
-                                let hash = packet.message_hash();
-                                let addr = packet.original_packet().meta().socket_addr();
-                                let from_staked = packet.original_packet().meta().flags.contains(PacketFlags::FROM_STAKED_NODE);
-                                let payer = packet.transaction().get_message().message.static_account_keys().get(0).unwrap();
-
-                                info!("Source {addr}, txn_hash: {hash}, prio: {prio}, cu_limit: {cus}, payer: {payer}, from_staked: {from_staked}");
-                            }
-                            None => {
-                                stats.failed_priority += 1;
-                            }
-                        };
+                        self.db_channel.send((unix_ts, packet).into()).unwrap();
                     }
                     Err(_) => {
                         error!("Error decoding packet");

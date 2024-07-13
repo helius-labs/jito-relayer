@@ -28,7 +28,7 @@ chrono = "0.4.24"
 clap = { version = "4", features = ["derive", "env"] }
 crossbeam-channel = "0.5.8"
 dashmap = "5.4.0"
-duckdb = "0.10.2"
+duckdb = { version = "1.0.0", features = ["bundled"] }
 ed25519-dalek = "1.0.1"
 env_logger = "0.9"
 futures-util = "0.3"

@@ -8,13 +8,13 @@ use std::{
     time::{Duration, Instant, SystemTime},
 };
 
+use crate::scorer::TrafficScorer;
 use crossbeam_channel::{Receiver, RecvTimeoutError, Sender};
 use jito_block_engine::block_engine::BlockEnginePackets;
 use jito_relayer::relayer::RelayerPacketBatches;
 use solana_core::banking_trace::BankingPacketBatch;
 use solana_metrics::datapoint_info;
 use tokio::sync::mpsc::error::TrySendError;
-use crate::scorer;
 
 pub const BLOCK_ENGINE_FORWARDER_QUEUE_CAPACITY: usize = 5_000;
 
@@ -27,12 +27,11 @@ pub fn start_forward_and_delay_thread(
     block_engine_sender: tokio::sync::mpsc::Sender<BlockEnginePackets>,
     num_threads: u64,
     disable_mempool: bool,
+    scorer: Arc<TrafficScorer>,
     exit: &Arc<AtomicBool>,
 ) -> Vec<JoinHandle<()>> {
     const SLEEP_DURATION: Duration = Duration::from_millis(5);
     let packet_delay = Duration::from_millis(packet_delay_ms as u64);
-    let scorer = Arc::new(scorer::TrafficScorer::new());
-
 
     (0..num_threads)
         .map(|thread_id| {
@@ -46,7 +45,6 @@ pub fn start_forward_and_delay_thread(
             Builder::new()
                 .name(format!("forwarder_thread_{thread_id}"))
                 .spawn(move || {
-
                     let mut buffered_packet_batches: VecDeque<RelayerPacketBatches> =
                         VecDeque::with_capacity(100_000);
 

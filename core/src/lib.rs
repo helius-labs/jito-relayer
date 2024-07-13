@@ -12,11 +12,11 @@ use std::{
 use log::*;
 
 mod fetch_stage;
+pub mod immutable_deserialized_packet;
 pub mod ofac;
+pub mod packet_filter;
 mod staked_nodes_updater_service;
 pub mod tpu;
-pub mod immutable_deserialized_packet;
-pub mod packet_filter;
 
 /// Returns an exit boolean to let other threads gracefully shut down
 pub fn graceful_panic(callback: Option<fn(&PanicInfo)>) -> Arc<AtomicBool> {

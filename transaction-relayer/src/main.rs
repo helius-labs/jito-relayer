@@ -1,3 +1,4 @@
+use std::sync::Mutex;
 use std::{
     collections::HashSet,
     fs,
@@ -17,7 +18,9 @@ use std::{
 use clap::Parser;
 use crossbeam_channel::tick;
 use dashmap::DashMap;
+use duckdb::Connection;
 use env_logger::Env;
+use itertools::Itertools;
 use jito_block_engine::block_engine::{BlockEngineConfig, BlockEngineRelayerHandler};
 use jito_core::{
     graceful_panic,
@@ -35,7 +38,9 @@ use jito_relayer::{
 };
 use jito_relayer_web::{start_relayer_web_server, RelayerState};
 use jito_rpc::load_balancer::LoadBalancer;
+use jito_transaction_relayer::db_service::DBSink;
 use jito_transaction_relayer::forwarder::start_forward_and_delay_thread;
+use jito_transaction_relayer::scorer::TrafficScorer;
 use jwt::{AlgorithmType, PKeyWithDigest};
 use log::{debug, error, info, warn};
 use openssl::{hash::MessageDigest, pkey::PKey};
@@ -49,6 +54,7 @@ use solana_sdk::{
 };
 use solana_validator::admin_rpc_service::StakedNodesOverrides;
 use tikv_jemallocator::Jemalloc;
+use tokio::sync::mpsc::unbounded_channel;
 use tokio::{runtime::Builder, signal, sync::mpsc::channel};
 use tonic::transport::Server;
 
@@ -236,6 +242,10 @@ struct Args {
     ///  Format of the file: `staked_map_id: {<pubkey>: <SOL stake amount>}
     #[arg(long, env)]
     staked_nodes_overrides: Option<PathBuf>,
+
+    /// Transaction scoring export path
+    #[arg(long, env, default_value = "s3://helius-transaction-scoring/devnet/")]
+    transaction_scoring_export_path: String,
 }
 
 #[derive(Debug)]
@@ -473,6 +483,16 @@ fn main() {
     let (block_engine_sender, block_engine_receiver) =
         channel(jito_transaction_relayer::forwarder::BLOCK_ENGINE_FORWARDER_QUEUE_CAPACITY);
 
+    let (sender, receiver) = unbounded_channel();
+    let conn = Arc::new(Mutex::new(Connection::open_in_memory().unwrap()));
+    let mut sink = DBSink::new(
+        exit.clone(),
+        receiver,
+        "s3://helius-transaction-scoring/devnet/".to_string(),
+        conn.clone(),
+    );
+    let scorer = Arc::new(TrafficScorer::new(sender));
+
     let forward_and_delay_threads = start_forward_and_delay_thread(
         verified_receiver,
         delay_packet_sender,
@@ -480,6 +500,7 @@ fn main() {
         block_engine_sender,
         1,
         args.disable_mempool,
+        scorer.clone(),
         &exit,
     );
 
@@ -576,6 +597,10 @@ fn main() {
             MAX_BUFFERED_REQUESTS,
             REQUESTS_PER_SECOND,
         )
+    });
+
+    let db_handle = rt.spawn(async move {
+        sink.run().await;
     });
 
     rt.block_on(async {
