@@ -72,9 +72,10 @@ impl TrafficScorer {
 
 
             for packet in packet_iter {
-                info!("packet: {:?}", packet);
                 stats.total_packets += 1;
-                self.db_channel.send((unix_ts, packet).into()).unwrap();
+                let row = (unix_ts, packet).into();
+                info!("packet row: {:?}", row);
+                self.db_channel.send(row).unwrap();
             }
             // for idx in 0..batch.len() {
             //
