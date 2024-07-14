@@ -12,6 +12,7 @@ use solana_sdk::signature::Signature;
 use solana_sdk::transaction::{SanitizedVersionedTransaction, VersionedTransaction};
 use std::mem::size_of;
 use std::net::{SocketAddr, SocketAddrV4};
+use solana_perf::packet::PacketBatch;
 use thiserror::Error;
 use tokio::sync::mpsc::{Sender, UnboundedSender};
 
@@ -36,6 +37,16 @@ impl Default for ScoringStats {
     }
 }
 
+
+fn generate_packet_indexes(packet_batch: &PacketBatch) -> Vec<usize> {
+    packet_batch
+        .iter()
+        .enumerate()
+        .filter(|(_, pkt)| !pkt.meta().discard())
+        .map(|(index, _)| index)
+        .collect()
+}
+
 impl TrafficScorer {
     pub fn new(db_channel: UnboundedSender<TransactionRow>) -> Self {
         TrafficScorer { db_channel }
@@ -48,19 +59,35 @@ impl TrafficScorer {
             .as_secs();
         let mut stats = ScoringStats::default();
         for batch in traffic.0.iter() {
-            for idx in 0..batch.len() {
-                let raw_packet = batch[idx].clone();
-                stats.total_packets += 1;
-                match ImmutableDeserializedPacket::new(raw_packet) {
-                    Ok(packet) => {
-                        self.db_channel.send((unix_ts, packet).into()).unwrap();
-                    }
-                    Err(e) => {
-                        error!("Error decoding packet: {e}");
-                        stats.failed_decoding += 1;
-                    }
-                };
+            let packet_indices = generate_packet_indexes(batch);
+            let packet_iter = packet_indices.iter().filter_map(move |packet_index| {
+                let mut packet_clone = batch[*packet_index].clone();
+                packet_clone
+                    .meta_mut()
+                    .set_round_compute_unit_price(false);
+                ImmutableDeserializedPacket::new(packet_clone)
+                    .ok()
+                    .filter(|_| true)
+            });
+
+            for packet in packet_iter {
+                self.db_channel.send((unix_ts, packet).into()).unwrap();
             }
+            // for idx in 0..batch.len() {
+            //
+            //
+            //     let raw_packet = batch[idx].clone();
+            //     stats.total_packets += 1;
+            //     match ImmutableDeserializedPacket::new(raw_packet) {
+            //         Ok(packet) => {
+            //             self.db_channel.send((unix_ts, packet).into()).unwrap();
+            //         }
+            //         Err(e) => {
+            //             error!("Error decoding packet: {e}");
+            //             stats.failed_decoding += 1;
+            //         }
+            //     };
+            // }
         }
 
         stats
