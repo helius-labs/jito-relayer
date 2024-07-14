@@ -8,7 +8,7 @@ COPY (
       day(sts) as day,
       hour(sts) as hour
     FROM transactions
-) TO XXXXXX
+) TO 'XXXXXX'
 (FORMAT PARQUET, PARTITION_BY (year, month, day, hour), OVERWRITE_OR_IGNORE, FILENAME_PATTERN "txn_scores_{uuid}");
 DELETE FROM transactions;
 COMMIT;

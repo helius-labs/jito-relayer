@@ -1,5 +1,4 @@
 use crate::db_service::TransactionRow;
-use duckdb::Connection;
 use jito_core::immutable_deserialized_packet::ImmutableDeserializedPacket;
 use log::{error, info};
 use solana_core::banking_trace::BankingPacketBatch;
@@ -56,8 +55,8 @@ impl TrafficScorer {
                     Ok(packet) => {
                         self.db_channel.send((unix_ts, packet).into()).unwrap();
                     }
-                    Err(_) => {
-                        error!("Error decoding packet");
+                    Err(e) => {
+                        error!("Error decoding packet: {e}");
                         stats.failed_decoding += 1;
                     }
                 };
