@@ -93,5 +93,6 @@ impl TrafficScorer {
         }
 
         info!("Processed {} packets", stats.total_packets);
+        stats
     }
 }
