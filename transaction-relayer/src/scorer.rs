@@ -70,7 +70,9 @@ impl TrafficScorer {
                     .filter(|_| true)
             });
 
+
             for packet in packet_iter {
+                stats.total_packets += 1;
                 self.db_channel.send((unix_ts, packet).into()).unwrap();
             }
             // for idx in 0..batch.len() {
@@ -90,6 +92,6 @@ impl TrafficScorer {
             // }
         }
 
-        stats
+        info!("Processed {} packets", stats.total_packets);
     }
 }
