@@ -72,6 +72,7 @@ impl TrafficScorer {
 
 
             for packet in packet_iter {
+                info!("packet: {:?}", packet);
                 stats.total_packets += 1;
                 self.db_channel.send((unix_ts, packet).into()).unwrap();
             }
