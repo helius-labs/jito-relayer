@@ -244,7 +244,7 @@ struct Args {
     staked_nodes_overrides: Option<PathBuf>,
 
     /// Transaction scoring export path
-    #[arg(long, env, default_value = "s3://helius-transaction-scoring/devnet/")]
+    #[arg(long, env, default_value = "s3://helius-traffic-scoring/devnet/")]
     transaction_scoring_export_path: String,
 }
 
