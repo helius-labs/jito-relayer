@@ -10,7 +10,7 @@ CREATE TABLE transactions (
     payer VARCHAR NOT NULL,
     source_ip UINTEGER NOT NULL,
 );
-CREATE SECRET (
+CREATE SECRET aws(
     TYPE S3,
     PROVIDER CREDENTIAL_CHAIN,
     REGION 'us-east-2'

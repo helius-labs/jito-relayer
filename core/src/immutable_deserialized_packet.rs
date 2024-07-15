@@ -131,7 +131,7 @@ impl ImmutableDeserializedPacket {
             self.is_simple_vote(),
             address_loader,
         )
-            .ok()?;
+        .ok()?;
         tx.verify_precompiles(feature_set).ok()?;
         Some(tx)
     }

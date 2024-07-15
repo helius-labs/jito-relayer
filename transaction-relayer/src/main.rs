@@ -488,7 +488,7 @@ fn main() {
     let mut sink = DBSink::new(
         exit.clone(),
         receiver,
-        "s3://helius-transaction-scoring/devnet/".to_string(),
+        args.transaction_scoring_export_path,
         conn.clone(),
     );
     let scorer = Arc::new(TrafficScorer::new(sender));

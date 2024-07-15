@@ -2,6 +2,7 @@ use crate::db_service::TransactionRow;
 use jito_core::immutable_deserialized_packet::ImmutableDeserializedPacket;
 use log::{error, info};
 use solana_core::banking_trace::BankingPacketBatch;
+use solana_perf::packet::PacketBatch;
 use solana_program::instruction::InstructionError::ProgramFailedToCompile;
 use solana_program::message::Message;
 use solana_program::sanitize::SanitizeError;
@@ -12,7 +13,6 @@ use solana_sdk::signature::Signature;
 use solana_sdk::transaction::{SanitizedVersionedTransaction, VersionedTransaction};
 use std::mem::size_of;
 use std::net::{SocketAddr, SocketAddrV4};
-use solana_perf::packet::PacketBatch;
 use thiserror::Error;
 use tokio::sync::mpsc::{Sender, UnboundedSender};
 
@@ -36,7 +36,6 @@ impl Default for ScoringStats {
         }
     }
 }
-
 
 fn generate_packet_indexes(packet_batch: &PacketBatch) -> Vec<usize> {
     packet_batch
@@ -62,14 +61,11 @@ impl TrafficScorer {
             let packet_indices = generate_packet_indexes(batch);
             let packet_iter = packet_indices.iter().filter_map(move |packet_index| {
                 let mut packet_clone = batch[*packet_index].clone();
-                packet_clone
-                    .meta_mut()
-                    .set_round_compute_unit_price(false);
+                packet_clone.meta_mut().set_round_compute_unit_price(false);
                 ImmutableDeserializedPacket::new(packet_clone)
                     .ok()
                     .filter(|_| true)
             });
-
 
             for packet in packet_iter {
                 stats.total_packets += 1;

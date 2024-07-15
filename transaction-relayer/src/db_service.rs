@@ -15,12 +15,12 @@ const LOCATION_TOKEN: &str = "XXXXXX";
 
 #[derive(Debug, Clone, PartialEq, Eq, Hash)]
 pub struct TransactionRow {
-    ts: u64,
-    priority: u64,
-    cu_limit: u64,
-    hash: String,
-    payer: String,
-    source: u32,
+    pub ts: u64,
+    pub priority: u64,
+    pub cu_limit: u64,
+    pub hash: String,
+    pub payer: String,
+    pub source: u32,
 }
 
 impl TransactionRow {
