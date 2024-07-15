@@ -37,7 +37,7 @@ CREATE SECRET (
         &format!("INSERT INTO transactions VALUES ({}, 2, 3, 'hash', 'payer', 4);", epoch_millis()),
         params![]
     ).unwrap();
-    conn.execute(&sync_replaced, params![]).unwrap();
+    conn.execute_batch(&sync_replaced).unwrap();
 
     Ok(())
 }
