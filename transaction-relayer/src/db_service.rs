@@ -1,6 +1,6 @@
 use duckdb::{params, Connection, Error};
 use jito_core::immutable_deserialized_packet::ImmutableDeserializedPacket;
-use log::error;
+use log::{error, info};
 use std::net::SocketAddr::V4;
 use std::sync::atomic::AtomicBool;
 use std::sync::{Arc, Mutex};
@@ -97,7 +97,7 @@ impl DBSink {
 
     pub async fn run(&mut self) {
         let mut flush_interval = tokio::time::interval(std::time::Duration::from_secs(1));
-        let mut s3_sync_interval = tokio::time::interval(std::time::Duration::from_secs(300));
+        let mut s3_sync_interval = tokio::time::interval(std::time::Duration::from_secs(60));
         let mut buffer: Vec<TransactionRow> = Vec::with_capacity(1024);
         while !self.exit_flag.load(std::sync::atomic::Ordering::Relaxed) {
             select! {
@@ -132,6 +132,7 @@ impl DBSink {
 
     fn sync(&self) {
         let guard = self.conn.lock().unwrap();
+        info!("Executing sync query: {}", self.sync_query);
         match guard.execute_batch(&self.sync_query) {
             Ok(()) => {}
             Err(e) => {
