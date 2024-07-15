@@ -106,6 +106,7 @@ impl DBSink {
                        if rows > 0{
                             let g = self.conn.lock().unwrap();
                             let mut appender = g.appender("transactions").unwrap();
+                            let mut ct = 0;
                             for row in buffer.iter() {
                                 if let Err(e) = appender.append_row(params![
                                     row.ts,
@@ -116,8 +117,21 @@ impl DBSink {
                                     row.source
                                 ]) {
                                     error!("Error appending row: {e}");
+                                } else {
+                                    ct += 1;
                                 }
                             }
+                            match appender.flush() {
+
+                                Ok(_) => {
+                                    info!("Flushed {ct} rows to DB");
+                                }
+                                Err(e) => {
+                                    error!("Error flushing appender: {e}");
+                                }
+
+                            }
+                            drop(appender);
                             buffer.clear();
                         }
                     }
