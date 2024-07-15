@@ -45,3 +45,11 @@ tokio = { workspace = true }
 tokio-stream = { workspace = true }
 tonic = { workspace = true }
 thiserror = "1.0.61"
+
+[[bin]]
+name = "jito-transaction-relayer"
+path = "src/main.rs"
+
+[[bin]]
+name = "duckdb-auth-tester"
+path = "src/duckdb-auth-tester.rs"
