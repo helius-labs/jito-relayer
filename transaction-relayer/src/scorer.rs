@@ -1,6 +1,6 @@
 use crate::db_service::TransactionRow;
 use jito_core::immutable_deserialized_packet::ImmutableDeserializedPacket;
-use log::{error, info};
+use log::{debug, error, info};
 use solana_core::banking_trace::BankingPacketBatch;
 use solana_perf::packet::PacketBatch;
 use solana_program::instruction::InstructionError::ProgramFailedToCompile;
@@ -70,24 +70,9 @@ impl TrafficScorer {
             for packet in packet_iter {
                 stats.total_packets += 1;
                 let row = (unix_ts, packet).into();
-                info!("packet row: {:?}", row);
+                debug!("packet row: {:?}", row);
                 self.db_channel.send(row).unwrap();
             }
-            // for idx in 0..batch.len() {
-            //
-            //
-            //     let raw_packet = batch[idx].clone();
-            //     stats.total_packets += 1;
-            //     match ImmutableDeserializedPacket::new(raw_packet) {
-            //         Ok(packet) => {
-            //             self.db_channel.send((unix_ts, packet).into()).unwrap();
-            //         }
-            //         Err(e) => {
-            //             error!("Error decoding packet: {e}");
-            //             stats.failed_decoding += 1;
-            //         }
-            //     };
-            // }
         }
 
         info!("Processed {} packets", stats.total_packets);
