@@ -98,11 +98,11 @@ impl DBSink {
     pub async fn run(&mut self) {
         let mut flush_interval = tokio::time::interval(std::time::Duration::from_secs(1));
         let mut s3_sync_interval = tokio::time::interval(std::time::Duration::from_secs(300));
-        let mut buffer: Vec<TransactionRow> = Vec::with_capacity(1024);
+        let mut buffer: Vec<TransactionRow> = Vec::with_capacity(4096);
         while !self.exit_flag.load(std::sync::atomic::Ordering::Relaxed) {
             select! {
                  _ = flush_interval.tick() => {
-                    if let Ok(rows) = timeout(Duration::from_millis(10), self.receiver.recv_many(&mut buffer, 1024)).await {
+                    if let Ok(rows) = timeout(Duration::from_millis(10), self.receiver.recv_many(&mut buffer, 4096)).await {
                        if rows > 0{
                             let g = self.conn.lock().unwrap();
                             let mut appender = g.appender("transactions").unwrap();
