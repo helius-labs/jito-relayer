@@ -8,6 +8,7 @@ use std::{
     time::{Duration, Instant, SystemTime},
 };
 
+use crate::scorer::TrafficScorer;
 use crossbeam_channel::{Receiver, RecvTimeoutError, Sender};
 use jito_block_engine::block_engine::BlockEnginePackets;
 use jito_relayer::relayer::RelayerPacketBatches;
@@ -26,6 +27,7 @@ pub fn start_forward_and_delay_thread(
     block_engine_sender: tokio::sync::mpsc::Sender<BlockEnginePackets>,
     num_threads: u64,
     disable_mempool: bool,
+    scorer: Arc<TrafficScorer>,
     exit: &Arc<AtomicBool>,
 ) -> Vec<JoinHandle<()>> {
     const SLEEP_DURATION: Duration = Duration::from_millis(5);
@@ -38,6 +40,8 @@ pub fn start_forward_and_delay_thread(
             let block_engine_sender = block_engine_sender.clone();
 
             let exit = exit.clone();
+            let co_scorer = scorer.clone();
+
             Builder::new()
                 .name(format!("forwarder_thread_{thread_id}"))
                 .spawn(move || {
@@ -75,6 +79,7 @@ pub fn start_forward_and_delay_thread(
                                     .sum::<u64>();
                                 forwarder_metrics.num_batches_received += 1;
                                 forwarder_metrics.num_packets_received += num_packets;
+                                co_scorer.score(&banking_packet_batch);
 
                                 // try_send because the block engine receiver only drains when it's connected
                                 // and we don't want to OOM on packet_receiver

@@ -12,7 +12,7 @@ members = [
 resolver = "1"
 
 [workspace.package]
-version = "0.2.0" 
+version = "0.2.0"
 authors = ["Jito Network <support@jito.network>"]
 repository = "https://github.com/jito-foundation/jito-relayer"
 homepage = "https://jito.network/"
@@ -28,6 +28,7 @@ chrono = "0.4.24"
 clap = { version = "4", features = ["derive", "env"] }
 crossbeam-channel = "0.5.8"
 dashmap = "5.4.0"
+duckdb = { version = "1.0.0", features = ["bundled"] }
 ed25519-dalek = "1.0.1"
 env_logger = "0.9"
 futures-util = "0.3"
@@ -60,6 +61,7 @@ sha2 = "0.10.6"
 solana-address-lookup-table-program = "=1.18.18"
 solana-client = "=1.18.18"
 solana-core = "=1.18.18"
+solana-cost-model = "=1.18.18"
 solana-gossip = "=1.18.18"
 solana-measure = "=1.18.18"
 solana-metrics = "=1.18.18"

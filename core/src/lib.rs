@@ -12,7 +12,9 @@ use std::{
 use log::*;
 
 mod fetch_stage;
+pub mod immutable_deserialized_packet;
 pub mod ofac;
+pub mod packet_filter;
 mod staked_nodes_updater_service;
 pub mod tpu;
 

@@ -12,6 +12,7 @@ publish = false
 chrono = { workspace = true }
 crossbeam-channel = { workspace = true }
 dashmap = { workspace = true }
+duckdb = {workspace = true}
 ed25519-dalek = { workspace = true }
 histogram = { workspace = true }
 jito-core = { workspace = true }
