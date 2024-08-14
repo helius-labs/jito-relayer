@@ -9,6 +9,8 @@ CREATE TABLE transactions (
     hash VARCHAR NOT NULL,
     payer VARCHAR NOT NULL,
     source_ip UINTEGER NOT NULL,
+    remote_pubkey VARCHAR NOT NULL,
+    num_sigs UTINYINT NOT NULL
 );
 CREATE SECRET aws(
     TYPE S3,

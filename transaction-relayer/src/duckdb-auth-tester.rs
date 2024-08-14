@@ -1,8 +1,7 @@
 use duckdb::{params, Connection};
 
 use jito_transaction_relayer::db_service::TransactionRow;
-use openssl::rand;
-use solana_validator::cli::app;
+
 use std::error::Error;
 use std::time::{SystemTime, UNIX_EPOCH};
 
@@ -20,6 +19,8 @@ CREATE TABLE transactions (
     hash VARCHAR NOT NULL,
     payer VARCHAR NOT NULL,
     source_ip UINTEGER NOT NULL,
+    remote_pubkey VARCHAR NOT NULL,
+    num_sigs UTINYINT NOT NULL,
 );
 CREATE SECRET (
     TYPE S3,
@@ -48,6 +49,8 @@ CREATE SECRET (
         hash: "hash".to_string(),
         payer: "payer".to_string(),
         source: 3,
+        remote_pubkey: "remote_pubkey".to_string(),
+        num_sigs: 4,
     };
 
     appender
@@ -57,7 +60,9 @@ CREATE SECRET (
             row.cu_limit,
             row.hash,
             row.payer,
-            row.source
+            row.source,
+            row.remote_pubkey,
+            row.num_sigs
         ])
         .unwrap();
     appender.flush().unwrap();

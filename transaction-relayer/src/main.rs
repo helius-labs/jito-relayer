@@ -599,7 +599,7 @@ fn main() {
         )
     });
 
-    let db_handle = rt.spawn(async move {
+    let _db_handle = rt.spawn(async move {
         sink.run().await;
     });
 

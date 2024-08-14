@@ -1,20 +1,9 @@
 use crate::db_service::TransactionRow;
 use jito_core::immutable_deserialized_packet::ImmutableDeserializedPacket;
-use log::{debug, error, info};
+use log::{debug, info};
 use solana_core::banking_trace::BankingPacketBatch;
 use solana_perf::packet::PacketBatch;
-use solana_program::instruction::InstructionError::ProgramFailedToCompile;
-use solana_program::message::Message;
-use solana_program::sanitize::SanitizeError;
-use solana_program::short_vec::decode_shortu16_len;
-use solana_runtime::transaction_priority_details::GetTransactionPriorityDetails;
-use solana_sdk::packet::{Packet, PacketFlags};
-use solana_sdk::signature::Signature;
-use solana_sdk::transaction::{SanitizedVersionedTransaction, VersionedTransaction};
-use std::mem::size_of;
-use std::net::{SocketAddr, SocketAddrV4};
-use thiserror::Error;
-use tokio::sync::mpsc::{Sender, UnboundedSender};
+use tokio::sync::mpsc::UnboundedSender;
 
 pub struct TrafficScorer {
     db_channel: UnboundedSender<TransactionRow>,

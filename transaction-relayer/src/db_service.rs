@@ -1,4 +1,4 @@
-use duckdb::{params, Connection, Error};
+use duckdb::{params, Connection};
 use jito_core::immutable_deserialized_packet::ImmutableDeserializedPacket;
 use log::{error, info};
 use std::net::SocketAddr::V4;
@@ -21,6 +21,8 @@ pub struct TransactionRow {
     pub hash: String,
     pub payer: String,
     pub source: u32,
+    pub remote_pubkey: String,
+    pub num_sigs: u8,
 }
 
 impl TransactionRow {
@@ -31,6 +33,8 @@ impl TransactionRow {
         hash: String,
         payer: String,
         source: u32,
+        remote_pubkey: String,
+        num_sigs: u8,
     ) -> Self {
         Self {
             ts,
@@ -39,6 +43,8 @@ impl TransactionRow {
             hash,
             payer,
             source,
+            remote_pubkey,
+            num_sigs,
         }
     }
 }
@@ -50,14 +56,15 @@ impl From<(u64, ImmutableDeserializedPacket)> for TransactionRow {
         let priority = packet.priority();
         let cu_limit = packet.compute_unit_limit();
         let hash = packet.message_hash().to_string();
-        let payer = packet
-            .transaction()
-            .get_message()
-            .message
+        let decoded_message = &packet.transaction().get_message().message;
+
+        let payer = decoded_message
             .static_account_keys()
             .get(0)
             .unwrap()
             .to_string();
+
+        let num_sigs = decoded_message.header().num_required_signatures;
 
         let numeric_ip: u32 = if let V4(addr) = packet.original_packet().meta().socket_addr() {
             (*addr.ip()).into()
@@ -65,7 +72,15 @@ impl From<(u64, ImmutableDeserializedPacket)> for TransactionRow {
             0
         };
 
-        Self::new(ts, priority, cu_limit, hash, payer, numeric_ip)
+        let remote_key = if let Some(pk) = packet.original_packet().meta().remote_pubkey {
+            pk.to_string()
+        } else {
+            "".to_string()
+        };
+
+        Self::new(
+            ts, priority, cu_limit, hash, payer, numeric_ip, remote_key, num_sigs,
+        )
     }
 }
 
@@ -75,7 +90,7 @@ pub struct DBSink {
     sync_query: String,
     conn: Arc<Mutex<Connection>>,
 }
-// unsafe impl Send for DBSink {}
+
 impl DBSink {
     pub fn new(
         exit_flag: Arc<AtomicBool>,
@@ -114,7 +129,9 @@ impl DBSink {
                                     row.cu_limit,
                                     row.hash,
                                     row.payer,
-                                    row.source
+                                    row.source,
+                                    row.remote_pubkey,
+                                    row.num_sigs
                                 ]) {
                                     error!("Error appending row: {e}");
                                 } else {
@@ -166,7 +183,16 @@ mod tests {
 
     #[test]
     fn test_transaction_row() {
-        let row = TransactionRow::new(1, 2, 3, "hash".to_string(), "payer".to_string(), 4);
+        let row = TransactionRow::new(
+            1,
+            2,
+            3,
+            "hash".to_string(),
+            "payer".to_string(),
+            4,
+            "remote_pk".to_string(),
+            5,
+        );
         assert_eq!(row.ts, 1);
         assert_eq!(row.priority, 2);
         assert_eq!(row.cu_limit, 3);
@@ -182,7 +208,16 @@ mod tests {
         let exit_flag = Arc::new(AtomicBool::new(false));
         let mut sink = DBSink::new(exit_flag.clone(), rx, "s3://test".to_string(), conn.clone());
         let handle = tokio::spawn(async move { sink.run().await });
-        let initial_row = TransactionRow::new(1, 2, 3, "hash".to_string(), "payer".to_string(), 4);
+        let initial_row = TransactionRow::new(
+            1,
+            2,
+            3,
+            "hash".to_string(),
+            "payer".to_string(),
+            4,
+            "remote_pk".to_string(),
+            5,
+        );
         tx.send(initial_row.clone()).unwrap();
 
         tokio::time::sleep(std::time::Duration::from_secs(6)).await;
@@ -198,6 +233,8 @@ mod tests {
                     hash: x.get(3)?,
                     payer: x.get(4)?,
                     source: x.get(5)?,
+                    remote_pubkey: x.get(6)?,
+                    num_sigs: x.get(7)?,
                 })
             })
             .unwrap();
