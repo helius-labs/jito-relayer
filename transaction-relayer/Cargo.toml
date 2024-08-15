@@ -13,6 +13,7 @@ bincode = { workspace = true }
 clap = { workspace = true }
 crossbeam-channel = { workspace = true }
 dashmap = { workspace = true }
+duckdb = {workspace = true}
 env_logger = { workspace = true }
 hostname = { workspace = true }
 itertools = { workspace = true }
@@ -31,6 +32,8 @@ serde_yaml = { workspace = true }
 solana-address-lookup-table-program = { workspace = true }
 solana-client = { workspace = true }
 solana-core = { workspace = true }
+solana-cost-model = { workspace = true }
+solana-runtime = {workspace = true}
 solana-metrics = { workspace = true }
 solana-net-utils = { workspace = true }
 solana-perf = { workspace = true }
@@ -41,3 +44,12 @@ tikv-jemallocator = { workspace = true }
 tokio = { workspace = true }
 tokio-stream = { workspace = true }
 tonic = { workspace = true }
+thiserror = "1.0.61"
+
+[[bin]]
+name = "jito-transaction-relayer"
+path = "src/main.rs"
+
+[[bin]]
+name = "duckdb-auth-tester"
+path = "src/duckdb-auth-tester.rs"
