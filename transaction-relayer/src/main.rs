@@ -439,12 +439,16 @@ fn main() {
     // Lookup table refresher
     let address_lookup_table_cache: Arc<DashMap<Pubkey, AddressLookupTableAccount>> =
         Arc::new(DashMap::new());
-    let lookup_table_refresher = start_lookup_table_refresher(
-        &rpc_load_balancer,
-        &address_lookup_table_cache,
-        Duration::from_secs(args.lookup_table_refresh_secs),
-        &exit,
-    );
+    let lookup_table_refresher = if !args.disable_mempool {
+        Some(start_lookup_table_refresher(
+            &rpc_load_balancer,
+            &address_lookup_table_cache,
+            Duration::from_secs(args.lookup_table_refresh_secs),
+            &exit,
+        ))
+    } else {
+        None
+    };
 
     let staked_nodes_overrides = match args.staked_nodes_overrides {
         None => StakedNodesOverrides::default(),
@@ -517,16 +521,21 @@ fn main() {
     } else {
         None
     };
-    let block_engine_forwarder = BlockEngineRelayerHandler::new(
-        block_engine_config,
-        block_engine_receiver,
-        keypair,
-        exit.clone(),
-        args.aoi_cache_ttl_secs,
-        address_lookup_table_cache.clone(),
-        &is_connected_to_block_engine,
-        ofac_addresses.clone(),
-    );
+
+    let block_engine_forwarder = if !args.disable_mempool {
+        Some(BlockEngineRelayerHandler::new(
+            block_engine_config,
+            block_engine_receiver,
+            keypair,
+            exit.clone(),
+            args.aoi_cache_ttl_secs,
+            address_lookup_table_cache.clone(),
+            &is_connected_to_block_engine,
+            ofac_addresses.clone(),
+        ))
+    } else {
+        None
+    };
 
     // receiver tracked as relayer_metrics.slot_receiver_len
     // downstream channel gets data that was duplicated by HealthManager
@@ -638,8 +647,12 @@ fn main() {
     for t in forward_and_delay_threads {
         t.join().unwrap();
     }
-    lookup_table_refresher.join().unwrap();
-    block_engine_forwarder.join();
+    if let Some(lookup_table_refresher) = lookup_table_refresher {
+        lookup_table_refresher.join().unwrap();
+    }
+    if let Some(block_engine_forwarder) = block_engine_forwarder {
+        block_engine_forwarder.join();
+    }
 }
 
 pub async fn shutdown_signal(exit: Arc<AtomicBool>) {
