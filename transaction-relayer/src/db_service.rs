@@ -1,4 +1,4 @@
-use duckdb::{params, Connection};
+use duckdb::{params, Connection, Error};
 use jito_core::immutable_deserialized_packet::ImmutableDeserializedPacket;
 use log::{error, info};
 use std::net::SocketAddr::V4;
